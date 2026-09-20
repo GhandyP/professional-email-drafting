@@ -302,3 +302,13 @@ func fieldsOfFindings(findings []Finding) []string {
 	}
 	return fields
 }
+
+func TestDraftValidateAcceptsAMisattributedClaim(t *testing.T) {
+	d := validDraft()
+	d.Body = "The client is very happy."
+	d.Claims = []Claim{{Text: "The client is very happy.", Fact: 0}}
+
+	if err := d.Validate(validInput()); err != nil {
+		t.Fatalf("Validate() = %v, want nil: validation proves provenance, not entailment, and the preview exposes the cited fact to the reviewer", err)
+	}
+}

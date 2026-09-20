@@ -63,7 +63,7 @@ go run . \
 | `-goal` | – | What the email must achieve; required. |
 | `-tone` | `concise` | One of `concise`, `formal`, `friendly`. |
 | `-language` | `en` | One of `en`, `es`. |
-| `-input` | – | Path to a JSON input file; explicit flags override its fields. |
+| `-input` | – | Path to a JSON input file; explicit scalar flags override its fields and `-fact` values are appended. |
 | `-approve` | – | Approver identity. Without it the run is a dry run and no sender is called. |
 | `-json` | `false` | Print the draft as JSON on stdout instead of the preview. |
 | `-html` | `false` | Print the HTML preview on stdout instead of the plain preview. |
@@ -78,9 +78,12 @@ Verified offline, with `GOPROXY=off` and no `GOOGLE_API_KEY` present:
 
 ```bash
 go build ./... && go vet ./... && go test ./...
+
+# The suite was verified with the network and the key switched off:
+env -u GOOGLE_API_KEY GOPROXY=off go test ./...
 ```
 
-The suite reports 73 tests (119 including subtests) passing. It covers input and draft validation, rendering and escaping, approval fingerprints, the sender boundary, the CLI pipeline with an injected drafter, and the ADK path through a fake model — so `llmagent`, the output schema, the runner turn, and the structured decode are all exercised without a network call.
+The suite reports 76 tests (122 including subtests) passing. It covers input and draft validation, rendering and escaping, approval fingerprints, the sender boundary, the CLI pipeline with an injected drafter, and the ADK path through a fake model — so `llmagent`, the output schema, the runner turn, and the structured decode are all exercised without a network call.
 
 Not verified: the live Gemini request. No test reaches the network, and this repository has not run the model against the real API. Treat the Gemini transport as untested until you run it with your own key.
 

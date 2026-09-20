@@ -75,6 +75,10 @@ func Run(ctx context.Context, args []string, deps Deps, stdout, stderr io.Writer
 		fmt.Fprintf(stderr, "configuration error: unknown sender %q (want disabled or recorder)\n", senderName)
 		return 2
 	}
+	if approver != "" && strings.TrimSpace(approver) == "" {
+		fmt.Fprintln(stderr, "configuration error: approver must not be blank")
+		return 2
+	}
 
 	drafter := deps.Drafter
 	if drafter == nil {

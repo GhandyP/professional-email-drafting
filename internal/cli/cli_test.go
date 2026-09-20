@@ -373,3 +373,13 @@ func TestRunPreviewShowsTheCitedFactForEachStatement(t *testing.T) {
 		}
 	}
 }
+
+func TestRunRejectsABlankApprover(t *testing.T) {
+	code, _, stderr := run(t, recorderDeps(&sender.Recorder{}), testArgs("-approve", "   ")...)
+	if code != 2 {
+		t.Fatalf("exit code = %d, want 2 (stderr: %s)", code, stderr)
+	}
+	if !strings.Contains(stderr, "approver") {
+		t.Fatalf("stderr %q does not mention the approver", stderr)
+	}
+}
