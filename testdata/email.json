@@ -1,0 +1,10 @@
+{
+  "recipient": "ana@example.com",
+  "facts": [
+    "Invoice 42 was paid on 2026-09-01.",
+    "Payment came from the operations account."
+  ],
+  "goal": "Confirm receipt of the payment.",
+  "tone": "concise",
+  "language": "en"
+}

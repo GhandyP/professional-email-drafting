@@ -1,17 +1,18 @@
-// Command professional-email-drafting drafts a professional email from supplied
-// facts and refuses to send anything without a recorded human approval.
-//
-// The pipeline is not wired yet. This entry point is a placeholder that keeps the
-// module building offline while the standalone port lands its packages; the real
-// CLI replaces it.
 package main
 
 import (
-	"fmt"
+	"context"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/GhandyP/professional-email-drafting/internal/cli"
 )
 
 func main() {
-	fmt.Fprintln(os.Stderr, "professional-email-drafting: pipeline not wired yet")
-	os.Exit(2)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	code := cli.Run(ctx, os.Args[1:], cli.Deps{Now: time.Now}, os.Stdout, os.Stderr)
+	stop()
+	os.Exit(code)
 }
