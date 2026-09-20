@@ -31,10 +31,10 @@ func testDraft() email.Draft {
 	}
 }
 
-func testApproval(t *testing.T, d email.Draft) email.Approval {
+func testApproval(t *testing.T, d email.Draft, recipient string) email.Approval {
 	t.Helper()
 
-	approval, err := email.Approve(d, "draft-1", "ana@example.com", approvedAt)
+	approval, err := email.Approve(d, recipient, "draft-1", "ana@example.com", approvedAt)
 	if err != nil {
 		t.Fatalf("email.Approve() error = %v, want nil", err)
 	}
@@ -45,7 +45,7 @@ func testApprovedMessage(t *testing.T) ApprovedMessage {
 	t.Helper()
 
 	d := testDraft()
-	msg, err := Approved(d, testInput(), testApproval(t, d))
+	msg, err := Approved(d, testInput(), testApproval(t, d, testInput().Recipient))
 	if err != nil {
 		t.Fatalf("Approved() error = %v, want nil", err)
 	}
@@ -87,7 +87,7 @@ func TestApprovedRejectsAnInvalidDraft(t *testing.T) {
 	d := testDraft()
 	d.Body = "The client is very happy."
 
-	msg, err := Approved(d, testInput(), testApproval(t, d))
+	msg, err := Approved(d, testInput(), testApproval(t, d, testInput().Recipient))
 	if err == nil {
 		t.Fatal("Approved() = nil error, want the draft findings")
 	}
@@ -105,7 +105,7 @@ func TestApprovedRejectsAMismatchedApproval(t *testing.T) {
 	other := testDraft()
 	other.Subject = "Payment confirmed"
 
-	msg, err := Approved(testDraft(), testInput(), testApproval(t, other))
+	msg, err := Approved(testDraft(), testInput(), testApproval(t, other, testInput().Recipient))
 	if !errors.Is(err, email.ErrApprovalMismatch) {
 		t.Fatalf("Approved() error = %v, want %v", err, email.ErrApprovalMismatch)
 	}
@@ -175,5 +175,40 @@ func TestRecorderRejectsUnapprovedMessages(t *testing.T) {
 	}
 	if got := len(recorder.Messages()); got != 0 {
 		t.Fatalf("len(Messages()) = %d, want 0", got)
+	}
+}
+
+func TestApprovedRejectsAnInvalidInput(t *testing.T) {
+	d := testDraft()
+	invalid := testInput()
+	invalid.Recipient = "not-an-address"
+
+	msg, err := Approved(d, invalid, testApproval(t, d, invalid.Recipient))
+	if err == nil {
+		t.Fatal("Approved() = nil error, want the input problems")
+	}
+
+	var verr *email.ValidationError
+	if !errors.As(err, &verr) {
+		t.Fatalf("Approved() error type = %T, want *email.ValidationError", err)
+	}
+	if msg.Authorized() {
+		t.Fatal("Authorized() = true, want false for an invalid input")
+	}
+}
+
+func TestApprovedRejectsADifferentRecipient(t *testing.T) {
+	d := testDraft()
+	approval := testApproval(t, d, "ana@example.com")
+
+	other := testInput()
+	other.Recipient = "bob@example.com"
+
+	msg, err := Approved(d, other, approval)
+	if !errors.Is(err, email.ErrApprovalMismatch) {
+		t.Fatalf("Approved() error = %v, want %v", err, email.ErrApprovalMismatch)
+	}
+	if msg.Authorized() {
+		t.Fatal("Authorized() = true, want false for a different recipient")
 	}
 }

@@ -119,7 +119,7 @@ func Run(ctx context.Context, args []string, deps Deps, stdout, stderr io.Writer
 	if now == nil {
 		now = time.Now
 	}
-	approval, err := email.Approve(draft, "draft-1", approver, now())
+	approval, err := email.Approve(draft, input.Recipient, "draft-1", approver, now())
 	if err != nil {
 		fmt.Fprintf(stderr, "approval failed: %v\n", err)
 		return 1
@@ -143,7 +143,7 @@ func Run(ctx context.Context, args []string, deps Deps, stdout, stderr io.Writer
 		fmt.Fprintf(stderr, "Send refused: %v\n", err)
 		return 3
 	}
-	fmt.Fprintf(stderr, "Approved by %s at %s: the %s sender accepted the message.\n", approval.ApprovedBy, approval.ApprovedAt.Format(time.RFC3339), senderName)
+	fmt.Fprintf(stderr, "Approved by %s at %s: the %s sender accepted the message.\n", approval.ApprovedBy(), approval.ApprovedAt().Format(time.RFC3339), senderName)
 	return 0
 }
 

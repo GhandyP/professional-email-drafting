@@ -14,22 +14,22 @@ var approvedAt = time.Date(2026, 9, 20, 12, 0, 0, 0, time.UTC)
 func TestApproveRecordsTheDraftFingerprint(t *testing.T) {
 	d := validDraft()
 
-	approval, err := Approve(d, " draft-1 ", " ana@example.com ", approvedAt)
+	approval, err := Approve(d, "ana@example.com", " draft-1 ", " ana@example.com ", approvedAt)
 	if err != nil {
 		t.Fatalf("Approve() error = %v, want nil", err)
 	}
 
-	if approval.DraftID != "draft-1" {
-		t.Fatalf("DraftID = %q, want %q", approval.DraftID, "draft-1")
+	if approval.DraftID() != "draft-1" {
+		t.Fatalf("DraftID = %q, want %q", approval.DraftID(), "draft-1")
 	}
-	if approval.ApprovedBy != "ana@example.com" {
-		t.Fatalf("ApprovedBy = %q, want %q", approval.ApprovedBy, "ana@example.com")
+	if approval.ApprovedBy() != "ana@example.com" {
+		t.Fatalf("ApprovedBy = %q, want %q", approval.ApprovedBy(), "ana@example.com")
 	}
-	if !approval.ApprovedAt.Equal(approvedAt) {
-		t.Fatalf("ApprovedAt = %v, want %v", approval.ApprovedAt, approvedAt)
+	if !approval.ApprovedAt().Equal(approvedAt) {
+		t.Fatalf("ApprovedAt = %v, want %v", approval.ApprovedAt(), approvedAt)
 	}
-	if approval.Fingerprint != d.Fingerprint() {
-		t.Fatalf("Fingerprint = %q, want %q", approval.Fingerprint, d.Fingerprint())
+	if approval.Fingerprint() != d.Fingerprint("ana@example.com") {
+		t.Fatalf("Fingerprint = %q, want %q", approval.Fingerprint(), d.Fingerprint("ana@example.com"))
 	}
 }
 
@@ -48,7 +48,7 @@ func TestApproveRejectsMissingIdentity(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			approval, err := Approve(validDraft(), tt.draftID, tt.approvedBy, approvedAt)
+			approval, err := Approve(validDraft(), "ana@example.com", tt.draftID, tt.approvedBy, approvedAt)
 			if !errors.Is(err, tt.want) {
 				t.Fatalf("Approve() error = %v, want %v", err, tt.want)
 			}
@@ -62,22 +62,22 @@ func TestApproveRejectsMissingIdentity(t *testing.T) {
 func TestApprovalAuthorizesTheApprovedDraft(t *testing.T) {
 	d := validDraft()
 
-	approval, err := Approve(d, "draft-1", "ana@example.com", approvedAt)
+	approval, err := Approve(d, "ana@example.com", "draft-1", "ana@example.com", approvedAt)
 	if err != nil {
 		t.Fatalf("Approve() error = %v, want nil", err)
 	}
-	if err := approval.Authorizes(d); err != nil {
+	if err := approval.Authorizes(d, "ana@example.com"); err != nil {
 		t.Fatalf("Authorizes() = %v, want nil", err)
 	}
 }
 
 func TestApprovalAuthorizesAnEqualDraft(t *testing.T) {
-	approval, err := Approve(validDraft(), "draft-1", "ana@example.com", approvedAt)
+	approval, err := Approve(validDraft(), "ana@example.com", "draft-1", "ana@example.com", approvedAt)
 	if err != nil {
 		t.Fatalf("Approve() error = %v, want nil", err)
 	}
 
-	if err := approval.Authorizes(validDraft()); err != nil {
+	if err := approval.Authorizes(validDraft(), "ana@example.com"); err != nil {
 		t.Fatalf("Authorizes() = %v, want nil for equal content", err)
 	}
 }
@@ -86,7 +86,7 @@ func TestApprovalRejectsChangedContent(t *testing.T) {
 	base := validDraft()
 	base.Unresolved = []string{"The receipt will follow tomorrow."}
 
-	approval, err := Approve(base, "draft-1", "ana@example.com", approvedAt)
+	approval, err := Approve(base, "ana@example.com", "draft-1", "ana@example.com", approvedAt)
 	if err != nil {
 		t.Fatalf("Approve() error = %v, want nil", err)
 	}
@@ -116,7 +116,7 @@ func TestApprovalRejectsChangedContent(t *testing.T) {
 			d.Unresolved = slices.Clone(base.Unresolved)
 			tt.mutate(&d)
 
-			if err := approval.Authorizes(d); !errors.Is(err, ErrApprovalMismatch) {
+			if err := approval.Authorizes(d, "ana@example.com"); !errors.Is(err, ErrApprovalMismatch) {
 				t.Fatalf("Authorizes() error = %v, want %v", err, ErrApprovalMismatch)
 			}
 		})
@@ -124,13 +124,13 @@ func TestApprovalRejectsChangedContent(t *testing.T) {
 }
 
 func TestApprovalRejectsZeroValue(t *testing.T) {
-	if err := (Approval{}).Authorizes(validDraft()); !errors.Is(err, ErrApprovalMismatch) {
+	if err := (Approval{}).Authorizes(validDraft(), "ana@example.com"); !errors.Is(err, ErrApprovalMismatch) {
 		t.Fatalf("Authorizes() error = %v, want %v", err, ErrApprovalMismatch)
 	}
 }
 
 func TestApprovalMismatchMessageNamesBothFingerprints(t *testing.T) {
-	approval, err := Approve(validDraft(), "draft-1", "ana@example.com", approvedAt)
+	approval, err := Approve(validDraft(), "ana@example.com", "draft-1", "ana@example.com", approvedAt)
 	if err != nil {
 		t.Fatalf("Approve() error = %v, want nil", err)
 	}
@@ -138,12 +138,12 @@ func TestApprovalMismatchMessageNamesBothFingerprints(t *testing.T) {
 	other := validDraft()
 	other.Subject = "Payment confirmed"
 
-	err = approval.Authorizes(other)
+	err = approval.Authorizes(other, "ana@example.com")
 	if err == nil {
 		t.Fatal("Authorizes() = nil, want a mismatch")
 	}
 	message := err.Error()
-	for _, want := range []string{approval.Fingerprint, other.Fingerprint()} {
+	for _, want := range []string{approval.Fingerprint(), other.Fingerprint("ana@example.com")} {
 		if !strings.Contains(message, want) {
 			t.Fatalf("error message %q does not mention fingerprint %q", message, want)
 		}
@@ -153,8 +153,8 @@ func TestApprovalMismatchMessageNamesBothFingerprints(t *testing.T) {
 func TestFingerprintIsAStableSHA256Hex(t *testing.T) {
 	d := validDraft()
 
-	first := d.Fingerprint()
-	second := validDraft().Fingerprint()
+	first := d.Fingerprint("ana@example.com")
+	second := validDraft().Fingerprint("ana@example.com")
 
 	if first != second {
 		t.Fatalf("Fingerprint() = %q and %q, want equal values for equal content", first, second)
@@ -168,7 +168,7 @@ func TestFingerprintIsAStableSHA256Hex(t *testing.T) {
 
 	changed := validDraft()
 	changed.Body = changed.Body + " Extra."
-	if changed.Fingerprint() == first {
+	if changed.Fingerprint("ana@example.com") == first {
 		t.Fatal("Fingerprint() did not change when the body changed")
 	}
 }
@@ -182,7 +182,7 @@ func TestFingerprintIgnoresNilAndEmptySlices(t *testing.T) {
 	withEmpty.Claims = []Claim{}
 	withEmpty.Unresolved = []string{}
 
-	if got, want := withNil.Fingerprint(), withEmpty.Fingerprint(); got != want {
+	if got, want := withNil.Fingerprint("ana@example.com"), withEmpty.Fingerprint("ana@example.com"); got != want {
 		t.Fatalf("Fingerprint() = %q for nil slices and %q for empty slices, want equal values", got, want)
 	}
 }
@@ -195,7 +195,7 @@ func TestApproveDoesNotMutateTheDraft(t *testing.T) {
 	want.Claims = slices.Clone(d.Claims)
 	want.Unresolved = slices.Clone(d.Unresolved)
 
-	if _, err := Approve(d, "draft-1", "ana@example.com", approvedAt); err != nil {
+	if _, err := Approve(d, "ana@example.com", "draft-1", "ana@example.com", approvedAt); err != nil {
 		t.Fatalf("Approve() error = %v, want nil", err)
 	}
 	if !reflect.DeepEqual(d, want) {
@@ -210,4 +210,46 @@ func isLowerHex(value string) bool {
 		}
 	}
 	return true
+}
+
+func TestApprovalRejectsADifferentRecipient(t *testing.T) {
+	approval, err := Approve(validDraft(), "ana@example.com", "draft-1", "ana@example.com", approvedAt)
+	if err != nil {
+		t.Fatalf("Approve() error = %v, want nil", err)
+	}
+
+	if err := approval.Authorizes(validDraft(), "bob@example.com"); !errors.Is(err, ErrApprovalMismatch) {
+		t.Fatalf("Authorizes() error = %v, want %v", err, ErrApprovalMismatch)
+	}
+	if err := approval.Authorizes(validDraft(), "ana@example.com"); err != nil {
+		t.Fatalf("Authorizes() error = %v, want nil for the approved recipient", err)
+	}
+}
+
+func TestFingerprintChangesWithTheRecipient(t *testing.T) {
+	d := validDraft()
+
+	if d.Fingerprint("ana@example.com") == d.Fingerprint("bob@example.com") {
+		t.Fatal("Fingerprint() is equal for two recipients, want different values")
+	}
+}
+
+func TestApprovalAccessorsExposeTheRecordedDecision(t *testing.T) {
+	approval, err := Approve(validDraft(), "ana@example.com", " draft-1 ", " ana@example.com ", approvedAt)
+	if err != nil {
+		t.Fatalf("Approve() error = %v, want nil", err)
+	}
+
+	if got, want := approval.DraftID(), "draft-1"; got != want {
+		t.Fatalf("DraftID() = %q, want %q", got, want)
+	}
+	if got, want := approval.ApprovedBy(), "ana@example.com"; got != want {
+		t.Fatalf("ApprovedBy() = %q, want %q", got, want)
+	}
+	if !approval.ApprovedAt().Equal(approvedAt) {
+		t.Fatalf("ApprovedAt() = %v, want %v", approval.ApprovedAt(), approvedAt)
+	}
+	if got, want := approval.Fingerprint(), validDraft().Fingerprint("ana@example.com"); got != want {
+		t.Fatalf("Fingerprint() = %q, want %q", got, want)
+	}
 }

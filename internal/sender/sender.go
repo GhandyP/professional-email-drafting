@@ -46,10 +46,13 @@ var ErrNotApproved = errors.New("message is not approved")
 
 // Approved validates, authorizes, and renders a draft into an approved message.
 func Approved(d email.Draft, in email.Input, approval email.Approval) (ApprovedMessage, error) {
+	if err := in.Validate(); err != nil {
+		return ApprovedMessage{}, err
+	}
 	if err := d.Validate(in); err != nil {
 		return ApprovedMessage{}, err
 	}
-	if err := approval.Authorizes(d); err != nil {
+	if err := approval.Authorizes(d, in.Recipient); err != nil {
 		return ApprovedMessage{}, err
 	}
 
@@ -60,13 +63,13 @@ func Approved(d email.Draft, in email.Input, approval email.Approval) (ApprovedM
 
 	return ApprovedMessage{
 		message: Message{
-			DraftID:    approval.DraftID,
+			DraftID:    approval.DraftID(),
 			To:         in.Recipient,
 			Subject:    strings.TrimSpace(d.Subject),
 			Plain:      d.RenderPlain(),
 			HTML:       html,
-			ApprovedBy: approval.ApprovedBy,
-			ApprovedAt: approval.ApprovedAt,
+			ApprovedBy: approval.ApprovedBy(),
+			ApprovedAt: approval.ApprovedAt(),
 		},
 		authorized: true,
 	}, nil

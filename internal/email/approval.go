@@ -12,10 +12,10 @@ import (
 
 // Approval binds an approval identity and timestamp to a draft fingerprint.
 type Approval struct {
-	DraftID     string
-	ApprovedBy  string
-	ApprovedAt  time.Time
-	Fingerprint string
+	draftID     string
+	approvedBy  string
+	approvedAt  time.Time
+	fingerprint string
 }
 
 // ErrMissingDraftID indicates that an approval is missing its draft identity.
@@ -27,8 +27,28 @@ var ErrMissingApprover = errors.New("missing approver")
 // ErrApprovalMismatch indicates that an approval does not match a draft.
 var ErrApprovalMismatch = errors.New("approval fingerprint mismatch")
 
+// DraftID returns the identity of the approved draft.
+func (a Approval) DraftID() string {
+	return a.draftID
+}
+
+// ApprovedBy returns the identity of the approver.
+func (a Approval) ApprovedBy() string {
+	return a.approvedBy
+}
+
+// ApprovedAt returns the time when the approval was recorded.
+func (a Approval) ApprovedAt() time.Time {
+	return a.approvedAt
+}
+
+// Fingerprint returns the draft fingerprint recorded by the approval.
+func (a Approval) Fingerprint() string {
+	return a.fingerprint
+}
+
 // Approve records approval for a draft after validating its identity fields.
-func Approve(d Draft, draftID, approvedBy string, at time.Time) (Approval, error) {
+func Approve(d Draft, recipient, draftID, approvedBy string, at time.Time) (Approval, error) {
 	draftID = strings.TrimSpace(draftID)
 	if draftID == "" {
 		return Approval{}, fmt.Errorf("draft ID is required: %w", ErrMissingDraftID)
@@ -40,15 +60,15 @@ func Approve(d Draft, draftID, approvedBy string, at time.Time) (Approval, error
 	}
 
 	return Approval{
-		DraftID:     draftID,
-		ApprovedBy:  approvedBy,
-		ApprovedAt:  at,
-		Fingerprint: d.Fingerprint(),
+		draftID:     draftID,
+		approvedBy:  approvedBy,
+		approvedAt:  at,
+		fingerprint: d.Fingerprint(recipient),
 	}, nil
 }
 
-// Fingerprint returns the stable SHA-256 fingerprint of the draft content.
-func (d Draft) Fingerprint() string {
+// Fingerprint returns the stable SHA-256 fingerprint of the draft content and recipient.
+func (d Draft) Fingerprint(recipient string) string {
 	claims := d.Claims
 	if claims == nil {
 		claims = []Claim{}
@@ -59,6 +79,7 @@ func (d Draft) Fingerprint() string {
 	}
 
 	canonical, _ := json.Marshal(struct {
+		Recipient  string
 		Subject    string
 		Body       string
 		Tone       Tone
@@ -66,6 +87,7 @@ func (d Draft) Fingerprint() string {
 		Claims     []Claim
 		Unresolved []string
 	}{
+		Recipient:  recipient,
 		Subject:    d.Subject,
 		Body:       d.Body,
 		Tone:       d.Tone,
@@ -79,10 +101,10 @@ func (d Draft) Fingerprint() string {
 }
 
 // Authorizes reports whether the approval matches the draft's fingerprint.
-func (a Approval) Authorizes(d Draft) error {
-	draftFingerprint := d.Fingerprint()
-	if a.Fingerprint == draftFingerprint {
+func (a Approval) Authorizes(d Draft, recipient string) error {
+	draftFingerprint := d.Fingerprint(recipient)
+	if a.fingerprint == draftFingerprint {
 		return nil
 	}
-	return fmt.Errorf("approval fingerprint %q does not match draft fingerprint %q: %w", a.Fingerprint, draftFingerprint, ErrApprovalMismatch)
+	return fmt.Errorf("approval fingerprint %q does not match draft fingerprint %q: %w", a.fingerprint, draftFingerprint, ErrApprovalMismatch)
 }
