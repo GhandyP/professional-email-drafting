@@ -6,11 +6,11 @@ A small, complete Go example built on [Google ADK for Go](https://github.com/goo
 
 ## The two guarantees
 
-**Grounded content.** Every sentence in the draft body must be matched by a claim that points at one of the supplied facts, or be listed as unresolved. Validation also rejects placeholder text, quoted-reply leakage, multi-line or oversized subjects, and claim fact indexes that do not exist. A model that invents a detail fails validation instead of reaching a reviewer.
+**Grounded content.** Every sentence in the draft body must be matched by a claim that points at one of the supplied facts, or be listed as unresolved. Validation also rejects placeholder text, quoted-reply leakage, multi-line or oversized subjects, and claim fact indexes that do not exist. It proves provenance, not entailment: it can prove that every body sentence is matched to a claim citing an existing fact, and it cannot prove that the fact entails the sentence. That judgement stays with the reviewer, which is why the preview prints the cited fact under each statement.
 
 **No send without approval.** `sender.Sender` accepts only `sender.ApprovedMessage`, a type whose approval flag is unexported and is set solely by `sender.Approved`, after the draft validates and the approval fingerprint matches the exact draft content. The only adapter wired in by default refuses every send, so nothing leaves the process.
 
-The dry-run preview makes both guarantees visible: fact-backed statements, framing statements, and unresolved items print in separate groups, so a reviewer sees in seconds which lines the model could not ground.
+The dry-run preview makes both guarantees visible: fact-backed statements, framing statements, and unresolved items print in separate groups, with the cited fact under each statement, so a reviewer sees in seconds which lines the model could not ground and which fact each remaining line leans on.
 
 ## Quick start
 
@@ -80,7 +80,7 @@ Verified offline, with `GOPROXY=off` and no `GOOGLE_API_KEY` present:
 go build ./... && go vet ./... && go test ./...
 ```
 
-The suite reports 68 tests (114 including subtests) passing. It covers input and draft validation, rendering and escaping, approval fingerprints, the sender boundary, the CLI pipeline with an injected drafter, and the ADK path through a fake model — so `llmagent`, the output schema, the runner turn, and the structured decode are all exercised without a network call.
+The suite reports 73 tests (119 including subtests) passing. It covers input and draft validation, rendering and escaping, approval fingerprints, the sender boundary, the CLI pipeline with an injected drafter, and the ADK path through a fake model — so `llmagent`, the output schema, the runner turn, and the structured decode are all exercised without a network call.
 
 Not verified: the live Gemini request. No test reaches the network, and this repository has not run the model against the real API. Treat the Gemini transport as untested until you run it with your own key.
 
@@ -88,7 +88,7 @@ Not verified: the live Gemini request. No test reaches the network, and this rep
 
 - **Framing text is declared, not assumed.** A salutation or sign-off is a claim with fact index `-1` (`email.NoFact`), so the preview prints it apart from the fact-backed statements instead of pretending it is grounded.
 - **The subject is a label, not an assertion.** It is validated for shape, placeholders, and quoted content, but deliberately not grounded; the body carries the claims.
-- **Approval is bound to content.** `email.Approval` stores a SHA-256 fingerprint of the draft, so editing a draft after approval invalidates it.
+- **Approval is bound to content and recipient.** `email.Approval` stores a SHA-256 fingerprint over the draft and the recipient, and its fields are unexported, so only `email.Approve` can record a decision. Editing the draft, or changing who receives it, invalidates the approval.
 - **The domain rejects blank facts; the CLI filters them.** User input is trimmed at the boundary, and the validator keeps the contract strict.
 - **There is exactly one send boundary.** The module contains no SMTP, HTTP, or process call. A real transport means implementing `sender.Sender` and passing it explicitly.
 

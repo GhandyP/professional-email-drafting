@@ -114,6 +114,7 @@ func TestRunDryRunPrintsThePreviewAndSendsNothing(t *testing.T) {
 		"Subject: Invoice 42 payment",
 		"Fact-backed statements:",
 		"[fact 1] Invoice 42 was paid on 2026-09-01.",
+		"from: Invoice 42 was paid on 2026-09-01.",
 		"Framing statements:",
 		"Unresolved items:",
 		"Message:",
@@ -346,4 +347,29 @@ func writeInputFixture(t *testing.T) string {
 		t.Fatalf("write input fixture: %v", err)
 	}
 	return path
+}
+
+func TestRunPreviewShowsTheCitedFactForEachStatement(t *testing.T) {
+	draft := testDraft()
+	draft.Body = "Invoice 42 was paid."
+	draft.Claims = []email.Claim{{Text: "Invoice 42 was paid.", Fact: 0}}
+
+	deps := Deps{
+		Drafter: fakeDrafter{draft: draft},
+		Sender:  &sender.Recorder{},
+		Now:     func() time.Time { return fixedNow },
+	}
+
+	code, stdout, stderr := run(t, deps, testArgs()...)
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr)
+	}
+	for _, want := range []string{
+		"[fact 1] Invoice 42 was paid.",
+		"from: Invoice 42 was paid on 2026-09-01.",
+	} {
+		if !strings.Contains(stdout, want) {
+			t.Fatalf("stdout does not contain %q:\n%s", want, stdout)
+		}
+	}
 }

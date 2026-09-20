@@ -107,7 +107,7 @@ func Run(ctx context.Context, args []string, deps Deps, stdout, stderr io.Writer
 		}
 		_, _ = io.WriteString(stdout, html)
 	} else {
-		_, _ = io.WriteString(stdout, plainPreview(draft))
+		_, _ = io.WriteString(stdout, plainPreview(draft, input.Facts))
 	}
 
 	if approver == "" {
@@ -236,7 +236,7 @@ func printDraftFindings(w io.Writer, err error) {
 	fmt.Fprintf(w, "  draft: validation: %s\n", err)
 }
 
-func plainPreview(draft email.Draft) string {
+func plainPreview(draft email.Draft, facts []string) string {
 	var b strings.Builder
 	b.WriteString("Draft preview\n\n")
 	b.WriteString("Subject: ")
@@ -251,6 +251,9 @@ func plainPreview(draft email.Draft) string {
 		}
 		factNumber++
 		fmt.Fprintf(&b, "  [fact %d] %s\n", claim.Fact+1, claim.Text)
+		if claim.Fact >= 0 && claim.Fact < len(facts) {
+			fmt.Fprintf(&b, "      from: %s\n", facts[claim.Fact])
+		}
 	}
 	if factNumber == 0 {
 		b.WriteString("  (none)\n")
