@@ -1,77 +1,101 @@
-# 02 — Draft professional emails
+# professional-email-drafting
 
-> **Status: standalone port in progress.** This directory is being turned into an
-> independent project with the module path `github.com/GhandyP/professional-email-drafting`.
-> Everything below is the original cookbook case note, kept as the design input for the
-> port, so the *Run the current prototype* section is stale: it described the shared
-> `internal/adkhelper` of `adk-go-enterprise-cookbook`, which a standalone module cannot
-> import. The CLI is not wired yet, and `go build ./...` is the only verified command
-> today. The *Missing elements* section below is the work this port executes.
+Draft a professional email from facts you supply, under a contract that refuses to state anything the facts do not support — and never send without a recorded human approval.
 
-## Goal
+A small, complete Go example built on [Google ADK for Go](https://github.com/google/adk-go) v2.2.0 and Gemini. It exists for the two hard parts of an LLM email feature: keeping the model inside the facts, and keeping a human between the model and the send button.
 
-Draft a professional email from supplied facts, a goal, a tone, and a language without adding unsupported claims or sending anything automatically.
+## The two guarantees
 
-## Run the current prototype
+**Grounded content.** Every sentence in the draft body must be matched by a claim that points at one of the supplied facts, or be listed as unresolved. Validation also rejects placeholder text, quoted-reply leakage, multi-line or oversized subjects, and claim fact indexes that do not exist. A model that invents a detail fails validation instead of reaching a reviewer.
 
-From this case directory:
+**No send without approval.** `sender.Sender` accepts only `sender.ApprovedMessage`, a type whose approval flag is unexported and is set solely by `sender.Approved`, after the draft validates and the approval fingerprint matches the exact draft content. The only adapter wired in by default refuses every send, so nothing leaves the process.
+
+The dry-run preview makes both guarantees visible: fact-backed statements, framing statements, and unresolved items print in separate groups, so a reviewer sees in seconds which lines the model could not ground.
+
+## Quick start
+
+Requirements: Go 1.26.5 or newer, and a `GOOGLE_API_KEY` from [Google AI Studio](https://aistudio.google.com/apikey).
 
 ```bash
 export GOOGLE_API_KEY="your-key"
-go run .
+
+# Dry run: draft, validate, preview. Nothing is sent.
+go run . -input testdata/email.json
+
+# The same draft as JSON, or as an escaped HTML document.
+go run . -input testdata/email.json -json
+go run . -input testdata/email.json -html
+
+# Record an approval, then watch the default sender refuse to deliver.
+go run . -input testdata/email.json -approve ana@example.com
+
+# Approve and record the message with the in-memory recorder instead.
+go run . -input testdata/email.json -approve ana@example.com -sender recorder
 ```
 
-`internal/adkhelper.Run` uses ADK Go v2.2.0, Gemini, and `gemini-flash-latest`; set `ADK_MODEL` to override the model.
+Facts can also come from flags:
 
-Sample prompt:
-
-```text
-Draft a polite follow-up from these three facts and keep the tone concise.
+```bash
+go run . \
+  -recipient ana@example.com \
+  -fact "Invoice 42 was paid on 2026-09-01." \
+  -goal "Confirm receipt of the payment." \
+  -tone concise -language en
 ```
 
-## What exists now
+## Package map
 
-- `main.go (exists)` launches one Gemini ADK agent through the shared helper.
-- The input is free-form text and the output is free-form draft text; recipient, facts, tone, and language are not validated.
-- This is intentionally text-only: no email provider, template store, approval record, or sender is connected.
+| Path | Responsibility |
+| --- | --- |
+| `main.go` | Signal-aware entry point; delegates to the CLI. |
+| `internal/email` | Domain contract: input and draft types, validation, rendering, approval fingerprints. No I/O. |
+| `internal/agent` | ADK wiring: output schema, grounded instruction, prompt, and the Gemini-backed drafter. |
+| `internal/sender` | Send boundary: `ApprovedMessage`, the disabled sender, and an in-memory recorder. |
+| `internal/cli` | Flag parsing, the preview, the approval gate, and the exit codes. |
+| `testdata/email.json` | Example input fixture, pinned to the contract by `main_test.go`. |
 
-## Missing elements
+## CLI reference
 
-- **Contract:** Define `DraftEmailInput{recipient, facts[], goal, tone, language}` -> `DraftEmail{subject, body, claims[], unresolved[]}`.
-- **ADK layer:** Add a response schema and a session for the thread; keep the agent instruction grounded in `facts`, with a future `send_email` function tool disabled by default.
-- **Domain boundary:** Add template/brand-policy lookup and an email-sender adapter that accepts only an approved draft ID.
-- **Fixtures and validation:** Test missing facts, placeholders, quoted replies, HTML/plain-text rendering, and unsupported claims with golden fixtures.
-- **Safety:** Show a dry-run preview and require a human approval event before any send; protect recipient and account data.
+| Flag | Default | Meaning |
+| --- | --- | --- |
+| `-recipient` | – | Recipient mailbox; required. |
+| `-fact` | – | Supporting fact; repeat for each fact. At least one is required. |
+| `-goal` | – | What the email must achieve; required. |
+| `-tone` | `concise` | One of `concise`, `formal`, `friendly`. |
+| `-language` | `en` | One of `en`, `es`. |
+| `-input` | – | Path to a JSON input file; explicit flags override its fields. |
+| `-approve` | – | Approver identity. Without it the run is a dry run and no sender is called. |
+| `-json` | `false` | Print the draft as JSON on stdout instead of the preview. |
+| `-html` | `false` | Print the HTML preview on stdout instead of the plain preview. |
+| `-sender` | `disabled` | `disabled` or `recorder`. |
+| `-timeout` | `60s` | Drafting timeout. |
 
-## Target structure
+Exit codes: `0` success, `1` rejected draft or drafting failure, `2` usage, input, or configuration error, `3` refused send. Data goes to stdout; narration and errors go to stderr.
 
-```text
-02-professional-email-drafting/
-├── main.go (exists)
-├── README.md (exists)
-├── agent.go (next)
-├── schema.go (next)
-├── policy.go (next)
-├── adapters/sender.go (next)
-├── testdata/email.json (next)
-└── main_test.go (next)
+## Verification status
+
+Verified offline, with `GOPROXY=off` and no `GOOGLE_API_KEY` present:
+
+```bash
+go build ./... && go vet ./... && go test ./...
 ```
 
-## Implementation order
+The suite reports 68 tests (114 including subtests) passing. It covers input and draft validation, rendering and escaping, approval fingerprints, the sender boundary, the CLI pipeline with an injected drafter, and the ADK path through a fake model — so `llmagent`, the output schema, the runner turn, and the structured decode are all exercised without a network call.
 
-1. Model facts, recipient, tone, language, and the draft output.
-2. Add schema validation, policy checks, and a thread session.
-3. Implement draft rendering and placeholder/claim validation.
-4. Add fixtures for short, multilingual, and incomplete requests.
-5. Add a disabled sender tool and approval-gated dry-run workflow.
+Not verified: the live Gemini request. No test reaches the network, and this repository has not run the model against the real API. Treat the Gemini transport as untested until you run it with your own key.
 
-## Done when
+## Design decisions
 
-- [ ] The draft contains only supplied or explicitly marked unresolved facts.
-- [ ] Subject, body, language, tone, and claims pass schema validation.
-- [ ] Tests cover missing facts, placeholders, and quoted replies.
-- [ ] No message leaves the system without a recorded human approval.
+- **Framing text is declared, not assumed.** A salutation or sign-off is a claim with fact index `-1` (`email.NoFact`), so the preview prints it apart from the fact-backed statements instead of pretending it is grounded.
+- **The subject is a label, not an assertion.** It is validated for shape, placeholders, and quoted content, but deliberately not grounded; the body carries the claims.
+- **Approval is bound to content.** `email.Approval` stores a SHA-256 fingerprint of the draft, so editing a draft after approval invalidates it.
+- **The domain rejects blank facts; the CLI filters them.** User input is trimmed at the boundary, and the validator keeps the contract strict.
+- **There is exactly one send boundary.** The module contains no SMTP, HTTP, or process call. A real transport means implementing `sender.Sender` and passing it explicitly.
 
-## Next improvement
+## Lineage
 
-Define `DraftEmail` first, then validate the current model response against it before adding a sender.
+This project started as case 02 of the `adk-go-enterprise-cookbook` and is now standalone: it owns its ADK wiring and depends only on the ADK and genai modules.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
