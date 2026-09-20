@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -246,7 +248,7 @@ func TestRunPrintsTheHTMLPreview(t *testing.T) {
 }
 
 func TestRunReadsTheInputFromAJSONFile(t *testing.T) {
-	code, stdout, stderr := run(t, recorderDeps(&sender.Recorder{}), "-input", "testdata/email.json")
+	code, stdout, stderr := run(t, recorderDeps(&sender.Recorder{}), "-input", writeInputFixture(t))
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr)
 	}
@@ -263,7 +265,7 @@ func TestRunPassesTheInputToTheDrafter(t *testing.T) {
 		Now:     func() time.Time { return fixedNow },
 	}
 
-	code, _, stderr := run(t, deps, "-input", "testdata/email.json")
+	code, _, stderr := run(t, deps, "-input", writeInputFixture(t))
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0 (stderr: %s)", code, stderr)
 	}
@@ -324,4 +326,24 @@ func TestRunRequiresAnAPIKeyWhenNoDrafterIsInjected(t *testing.T) {
 	if !strings.Contains(stderr, "GOOGLE_API_KEY") {
 		t.Fatalf("stderr %q does not mention the missing key", stderr)
 	}
+}
+
+func writeInputFixture(t *testing.T) string {
+	t.Helper()
+
+	path := filepath.Join(t.TempDir(), "email.json")
+	contents := `{
+  "recipient": "ana@example.com",
+  "facts": [
+    "Invoice 42 was paid on 2026-09-01.",
+    "Payment came from the operations account."
+  ],
+  "goal": "Confirm receipt of the payment.",
+  "tone": "concise",
+  "language": "en"
+}`
+	if err := os.WriteFile(path, []byte(contents), 0o600); err != nil {
+		t.Fatalf("write input fixture: %v", err)
+	}
+	return path
 }

@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -171,9 +170,6 @@ func resolveInput(flags *flag.FlagSet, inputPath, recipient, goal, tone, languag
 	var input email.Input
 	if set["input"] {
 		contents, err := os.ReadFile(inputPath)
-		if err != nil && !filepath.IsAbs(inputPath) {
-			contents, err = os.ReadFile(filepath.Join("..", "..", inputPath))
-		}
 		if err != nil {
 			return email.Input{}, fmt.Errorf("read %q: %w", inputPath, err)
 		}
