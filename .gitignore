@@ -1,0 +1,10 @@
+# Local Pi runtime state (not part of the project)
+.atl/
+
+# Build output
+/dist/
+*.test
+
+# Stale binary copied from the cookbook build
+/02-professional-email-drafting
+/professional-email-drafting
