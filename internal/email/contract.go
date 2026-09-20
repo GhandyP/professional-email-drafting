@@ -45,6 +45,9 @@ type Claim struct {
 	Fact int
 }
 
+// NoFact indicates that a claim declares framing text (salutation, sign-off, courtesy) that is deliberately not fact-backed.
+const NoFact = -1
+
 type Problem struct {
 	Field   string
 	Message string
