@@ -45,3 +45,24 @@ jobs:
 
       - name: Test
         run: go test -race -count=1 ./...
+
+  image:
+    name: docker build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+
+      - name: Build the image
+        run: docker build -t professional-email-drafting:test .
+
+      - name: Smoke the image without a key
+        run: |
+          set +e
+          out="$(docker run --rm professional-email-drafting:test -input testdata/email.json 2>&1)"
+          code=$?
+          set -e
+          echo "$out"
+          if [ "$code" -ne 2 ]; then echo "expected exit 2 without a key, got $code" >&2; exit 1; fi
+          if ! echo "$out" | grep -q GOOGLE_API_KEY; then echo "expected a GOOGLE_API_KEY message" >&2; exit 1; fi

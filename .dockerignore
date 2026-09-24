@@ -1,0 +1,9 @@
+# Keep the build context small and the image reproducible.
+.git
+.github
+.atl
+*.md
+LICENSE
+Makefile
+Dockerfile
+02-professional-email-drafting

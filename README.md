@@ -45,6 +45,24 @@ go run . \
   -tone concise -language en
 ```
 
+## Run with Docker
+
+The image builds the binary and ships the example fixture, so the dry run works without a local Go toolchain:
+
+```bash
+docker build -t professional-email-drafting .
+
+# Dry run against the bundled fixture: nothing is sent.
+docker run --rm professional-email-drafting -input testdata/email.json
+
+# Use your own input file from the host.
+docker run --rm -v "$PWD:/work" -w /work \
+  -e GOOGLE_API_KEY="your-key" \
+  professional-email-drafting -input /work/email.json
+```
+
+The runtime stage is `gcr.io/distroless/static-debian12:nonroot`: no shell, no package manager, and it runs as a non-root user. `GOOGLE_API_KEY` is read from the environment and is never baked into the image.
+
 ## Package map
 
 | Path | Responsibility |
