@@ -1,5 +1,7 @@
 # professional-email-drafting
 
+[![CI](https://github.com/GhandyP/professional-email-drafting/actions/workflows/ci.yml/badge.svg)](https://github.com/GhandyP/professional-email-drafting/actions/workflows/ci.yml)
+
 Draft a professional email from facts you supply, under a contract that refuses to state anything the facts do not support — and never send without a recorded human approval.
 
 A small, complete Go example built on [Google ADK for Go](https://github.com/google/adk-go) v2.2.0 and Gemini. It exists for the two hard parts of an LLM email feature: keeping the model inside the facts, and keeping a human between the model and the send button.
@@ -82,6 +84,8 @@ go build ./... && go vet ./... && go test ./...
 # The suite was verified with the network and the key switched off:
 env -u GOOGLE_API_KEY GOPROXY=off go test ./...
 ```
+
+CI runs the same checks — `gofmt`, `go vet`, `go build`, and `go test -race` — on every push and every pull request.
 
 The suite reports 76 tests (122 including subtests) passing. It covers input and draft validation, rendering and escaping, approval fingerprints, the sender boundary, the CLI pipeline with an injected drafter, and the ADK path through a fake model — so `llmagent`, the output schema, the runner turn, and the structured decode are all exercised without a network call.
 
